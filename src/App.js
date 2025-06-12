@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import PaymentReturn from './pages/PaymentReturn';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/admin/Dashboard';
@@ -32,6 +33,7 @@ function App() {
           <Route path="/cart" element={<Cart />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/payment-return" element={<PaymentReturn />} />
           
           {/* Protected Routes */}
           <Route path="/checkout" element={

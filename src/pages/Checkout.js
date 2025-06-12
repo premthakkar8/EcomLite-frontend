@@ -15,7 +15,8 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [shippingAddress, setShippingAddress] = useState({});
-  const [paymentMethod, setPaymentMethod] = useState('Razorpay');
+  const [paymentMethod, setPaymentMethod] = useState('PayU');
+  const [paymentLink, setPaymentLink] = useState('');
   
   // Get cart items and shipping address from localStorage
   useEffect(() => {
@@ -34,6 +35,28 @@ const Checkout = () => {
     if (items.length === 0) {
       navigate('/cart');
     }
+
+    // Get PayU payment link
+    const getPaymentLink = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (token) {
+          const { data } = await axios.get(
+            `${process.env.REACT_APP_API_BASE_URL}/api/payment/link`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+          setPaymentLink(data.paymentLink);
+        }
+      } catch (error) {
+        console.error('Error fetching payment link:', error);
+      }
+    };
+
+    getPaymentLink();
   }, [navigate]);
   
   // Calculate prices
@@ -79,78 +102,11 @@ const Checkout = () => {
         }
       );
       
-      // Create Razorpay order
-      const { data: razorpayOrder } = await axios.post(
-        `${process.env.REACT_APP_API_BASE_URL}/api/payment/create-order`,
-        {
-          amount: totalPrice,
-          receipt: order._id,
-          notes: {
-            orderId: order._id,
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // Store order ID in localStorage for reference after payment
+      localStorage.setItem('currentOrderId', order._id);
       
-      // Get Razorpay key
-      const { data: keyData } = await axios.get(
-        `${process.env.REACT_APP_API_BASE_URL}/api/payment/key`
-      );
-      
-      // Initialize Razorpay
-      const options = {
-        key: keyData.key,
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        name: 'EcomLite',
-        description: `Order #${order._id}`,
-        order_id: razorpayOrder.id,
-        handler: async function (response) {
-          try {
-            // Verify payment
-            await axios.post(
-              `${process.env.REACT_APP_API_BASE_URL}/api/payment/verify`,
-              {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                orderId: order._id,
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
-            
-            // Clear cart
-            localStorage.removeItem('cartItems');
-            
-            toast.success('Payment successful!');
-            navigate(`/order/${order._id}`);
-          } catch (error) {
-            toast.error('Payment verification failed');
-            console.error(error);
-          }
-        },
-        prefill: {
-          name: JSON.parse(localStorage.getItem('userInfo'))?.name || '',
-          email: JSON.parse(localStorage.getItem('userInfo'))?.email || '',
-        },
-        theme: {
-          color: '#3399cc',
-        },
-      };
-      
-      setLoading(false);
-      
-      // Open Razorpay
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+      // Redirect to PayU payment link
+      window.location.href = paymentLink;
       
     } catch (error) {
       setLoading(false);
@@ -179,10 +135,10 @@ const Checkout = () => {
               <Form.Group>
                 <Form.Check
                   type='radio'
-                  label='Razorpay'
-                  id='Razorpay'
+                  label='PayU'
+                  id='PayU'
                   name='paymentMethod'
-                  value='Razorpay'
+                  value='PayU'
                   checked
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 ></Form.Check>
@@ -254,7 +210,7 @@ const Checkout = () => {
                 <Button
                   type='button'
                   className='btn-block w-100'
-                  disabled={cartItems.length === 0 || loading}
+                  disabled={cartItems.length === 0 || loading || !paymentLink}
                   onClick={createOrder}
                 >
                   {loading ? <Loader /> : 'Place Order'}
